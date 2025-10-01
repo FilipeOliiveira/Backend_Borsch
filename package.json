@@ -1,0 +1,19 @@
+{
+  "name": "sistema-vendas-backend",
+  "version": "1.0.0",
+  "description": "Backend para o Sistema de Importação e Visualização de Vendas.",
+  "main": "src/api.js",
+  "scripts": {
+    "start": "node src/api.js",
+    "import": "node src/importador.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2",
+    "sqlite3": "^5.1.7"
+  }
+}
