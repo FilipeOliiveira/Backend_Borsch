@@ -13,7 +13,7 @@ CREATE TABLE clientes (
 
 -- Tabela de Vendas
 CREATE TABLE vendas (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     produto_id INTEGER REFERENCES produtos(id),
     cliente_id INTEGER REFERENCES clientes(id),
     quantidade INTEGER NOT NULL,
