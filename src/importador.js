@@ -2,14 +2,25 @@ require('dotenv').config();
 const fs = require('fs');
 const { Pool } = require('pg');
 
-// Configuração do Pool de Conexões do PostgreSQL
-const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_DATABASE,
-});
+// Lógica de configuração do banco de dados para suportar tanto o ambiente local (Docker) quanto a nuvem (Render)
+const dbConfig = process.env.DATABASE_URL ? 
+  // Configuração para Nuvem (Render, Heroku, etc.)
+  {
+    connectionString: process.env.DATABASE_URL,
+    ssl: {
+      rejectUnauthorized: false // Necessário para a maioria das conexões de DB em nuvem
+    }
+  } : 
+  // Configuração para Ambiente Local (Docker)
+  {
+    host: process.env.DB_HOST,
+    port: process.env.DB_PORT,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_DATABASE,
+  };
+
+const pool = new Pool(dbConfig);
 
 // 1. Função para parsear uma linha do arquivo de dados (sem alterações)
 function parseLine(line) {
