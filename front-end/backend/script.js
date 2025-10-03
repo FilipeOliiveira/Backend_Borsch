@@ -62,7 +62,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function loadSalesData() {
         try {
-            const response = await fetch('http://localhost:3000/vendas');
+                        const apiUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+                ? 'http://localhost:3000/vendas'
+                : 'https://backend-borsch-3.onrender.com/vendas';
+            const response = await fetch(apiUrl);
             if (!response.ok) {
                 throw new Error('Erro ao buscar dados da API');
             }
