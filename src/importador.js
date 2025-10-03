@@ -13,14 +13,14 @@ const sqlite3 = require('sqlite3').verbose();
 // 1. Função para parsear uma linha do arquivo de dados
 function parseLine(line) {
   const idProduto = parseInt(line.substring(0, 4).trim(), 10);
-  const nomeProduto = line.substring(4, 54).trim();
-  const idCliente = parseInt(line.substring(54, 58).trim(), 10);
-  const nomeCliente = line.substring(58, 108).trim();
-  const qtdVendida = parseInt(line.substring(108, 111).trim(), 10);
-  const valorUnitStr = line.substring(111, 121).trim();
+  const nomeProduto = line.substring(4, 49).trim();
+  const idCliente = parseInt(line.substring(50, 55).trim(), 10);
+  const nomeCliente = line.substring(55, 107).trim();
+  const qtdVendida = parseInt(line.substring(108, 110).trim(), 10);
+  const valorUnitStr = line.substring(111, 119).trim();
   const valorUnitario = parseFloat(valorUnitStr.slice(0, -2) + '.' + valorUnitStr.slice(-2));
   const dataVenda = line.substring(121, 131).trim();
-  return { idProduto, nomeProduto, idCliente, nomeCliente, qtdVendida, valorUnitario, dataVenda };
+  return { idProduto, nomeProduto, idCliente, nomeCliente, qtdVendida, valorUnitario, dataVenda };
 }
 
 // 2. Função que executa a importação dos dados
