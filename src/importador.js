@@ -3,43 +3,35 @@ const fs = require('fs');
 const { Pool } = require('pg');
 
 // Lógica de configuração do banco de dados para suportar tanto o ambiente local (Docker) quanto a nuvem (Render)
-const dbConfig = process.env.DATABASE_URL ? 
-  // Configuração para Nuvem (Render, Heroku, etc.)
-  {
-    connectionString: process.env.DATABASE_URL,
-    ssl: {
-      rejectUnauthorized: false // Necessário para a maioria das conexões de DB em nuvem
+const dbConfig = process.env.DATABASE_URL
+  ? // Configuração para Nuvem (Render, Heroku, etc.)
+    {
+      connectionString: process.env.DATABASE_URL,
+      ssl: {
+        rejectUnauthorized: false, // Necessário para a maioria das conexões de DB em nuvem
+      },
     }
-  } : 
-  // Configuração para Ambiente Local (Docker)
-  {
-    host: process.env.DB_HOST,
-    port: process.env.DB_PORT,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_DATABASE,
-  };
+  : // Configuração para Ambiente Local (Docker)
+    {
+      host: process.env.DB_HOST,
+      port: process.env.DB_PORT,
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_DATABASE,
+    };
 
 const pool = new Pool(dbConfig);
 
 function parseLine(line) {
-  const idProduto = parseInt(line.substring(0, 4).trim(), 10);
-  const nomeProduto = line.substring(4, 49).trim();
-  const idCliente = parseInt(line.substring(50, 55).trim(), 10);
-  const nomeCliente = line.substring(55, 107).trim();
-  const qtdVendida = parseInt(line.substring(108, 110).trim(), 10);
-  const valorUnitStr = line.substring(111, 119).trim();
-  const valorUnitario = parseFloat(valorUnitStr.slice(0, -2) + '.' + valorUnitStr.slice(-2));
+  const idProduto = parseInt(line.slice(0, 4).trim(), 10); // 1–4
+  const nomeProduto = line.slice(4, 54).trim(); // 5–54 (50 chars)
+  const idCliente = parseInt(line.slice(54, 58).trim(), 10); // 55–58
+  const nomeCliente = line.slice(58, 108).trim(); // 59–108 (50 chars)
+  const qtdVendida = parseInt(line.slice(108, 111).trim(), 10); // 109–111 (3 chars)
+  const valorUnit = parseFloat(line.slice(111, 121).trim()); // 112–121 (já decimal)
+  const dataVenda = line.slice(121, 131).trim(); // 122–131 (YYYY-MM-DD)
 
-  // Correção final e definitiva para o formato da data
-  let dataVenda = line.substring(121, 131).trim();
-  if (dataVenda.startsWith('025')) {
-    dataVenda = dataVenda.replace('025', '2025');
-  } else if (dataVenda.startsWith('25')) {
-    dataVenda = dataVenda.replace('25', '2025');
-  }
-
-  return { idProduto, nomeProduto, idCliente, nomeCliente, qtdVendida, valorUnitario, dataVenda };
+  return { idProduto, nomeProduto, idCliente, nomeCliente, qtdVendida, valorUnit, dataVenda };
 }
 
 async function importData() {
@@ -54,29 +46,30 @@ async function importData() {
 
   try {
     const fileContent = fs.readFileSync(filePath, 'utf-8');
-    const lines = fileContent.split('\n').filter(line => line.trim() !== '');
+    const lines = fileContent.split('\n').filter((line) => line.trim() !== '');
 
     await client.query('BEGIN');
 
-    const produtoQuery = 'INSERT INTO produtos (id, nome, valor_unitario) VALUES ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET nome = EXCLUDED.nome, valor_unitario = EXCLUDED.valor_unitario';
-    const clienteQuery = 'INSERT INTO clientes (id, nome) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET nome = EXCLUDED.nome';
-    const vendaQuery = 'INSERT INTO vendas (produto_id, cliente_id, quantidade, data_venda) VALUES ($1, $2, $3, $4)';
+    const produtoQuery =
+      'INSERT INTO produtos (id, nome, valor_unitario) VALUES ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET nome = EXCLUDED.nome, valor_unitario = EXCLUDED.valor_unitario';
+    const clienteQuery =
+      'INSERT INTO clientes (id, nome) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET nome = EXCLUDED.nome';
+    const vendaQuery =
+      'INSERT INTO vendas (produto_id, cliente_id, quantidade, data_venda) VALUES ($1, $2, $3, $4)';
 
     for (const line of lines) {
       const venda = parseLine(line);
-      await client.query(produtoQuery, [venda.idProduto, venda.nomeProduto, venda.valorUnitario]);
+      await client.query(produtoQuery, [venda.idProduto, venda.nomeProduto, venda.valorUnit]);
       await client.query(clienteQuery, [venda.idCliente, venda.nomeCliente]);
       await client.query(vendaQuery, [venda.idProduto, venda.idCliente, venda.qtdVendida, venda.dataVenda]);
     }
 
     await client.query('COMMIT');
     console.log(`Importação de ${lines.length} registros concluída com sucesso!`);
-
   } catch (error) {
     await client.query('ROLLBACK');
     console.error('Erro durante a importação. A transação foi desfeita (ROLLBACK).', error);
     process.exit(1);
-
   } finally {
     client.release();
   }
