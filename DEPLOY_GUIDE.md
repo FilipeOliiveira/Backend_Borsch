@@ -57,25 +57,45 @@ Execute os seguintes comandos:
 
 #### **4. Configure o Banco de Dados (Executar apenas uma vez)**
 
-O container do banco de dados foi iniciado, mas ele está vazio. Vamos criar as tabelas usando um método direto e à prova de erros.
+O container do banco de dados foi iniciado, mas ele está vazio. Precisamos criar as tabelas.
 
-1.  **Execute o comando abaixo** no seu terminal para entrar no ambiente de linha de comando do banco de dados:
-    ```sh
-    docker-compose exec db psql -U postgres
-    ```
+1.  **Conecte-se ao Banco de Dados:**
+    *   Use seu programa preferido (DBeaver, pgAdmin, etc.) para se conectar ao banco de dados.
+    *   **Importante:** Ao configurar a conexão no seu programa, use `localhost` como host, pois o programa está na sua máquina (host) se conectando à porta que o Docker expõe.
+    *   **Dados de Conexão:**
+        *   Host: `localhost`
+        *   Porta: `5432`
+        *   Base de Dados: `postgres`
+        *   Usuário: `postgres`
+        *   Senha: `mysecretpassword` (a mesma do seu arquivo `.env`)
 
-2.  Seu prompt de comando mudará para `postgres=#`. Isso confirma que você está dentro do banco de dados correto.
+2.  **Execute o Script de Criação de Tabelas:**
+    *   Após conectar, abra uma nova janela de script/query.
+    *   Copie e cole o código SQL abaixo e execute-o para criar as tabelas.
 
-3.  **Copie todo o bloco de código SQL abaixo**:
-    ```sql
-    CREATE TABLE clientes (id SERIAL PRIMARY KEY, nome VARCHAR(255) NOT NULL);
-    CREATE TABLE produtos (id SERIAL PRIMARY KEY, nome VARCHAR(255) NOT NULL, valor_unitario NUMERIC(10, 2) NOT NULL);
-    CREATE TABLE vendas (id SERIAL PRIMARY KEY, data_venda DATE NOT NULL, quantidade INTEGER NOT NULL, produto_id INTEGER NOT NULL REFERENCES produtos(id), cliente_id INTEGER NOT NULL REFERENCES clientes(id));
-    ```
+```sql
+-- Tabela de Clientes
+CREATE TABLE clientes (
+    id SERIAL PRIMARY KEY,
+    nome VARCHAR(255) NOT NULL
+);
 
-4.  **Cole o bloco no terminal** (onde está o prompt `postgres=#`) e pressione **Enter**. As tabelas serão criadas.
+-- Tabela de Produtos
+CREATE TABLE produtos (
+    id SERIAL PRIMARY KEY,
+    nome VARCHAR(255) NOT NULL,
+    valor_unitario NUMERIC(10, 2) NOT NULL
+);
 
-5.  Para sair do ambiente do banco de dados, digite `\q` e pressione **Enter**. Você voltará ao seu terminal normal.
+-- Tabela de Vendas
+CREATE TABLE vendas (
+    id SERIAL PRIMARY KEY,
+    data_venda DATE NOT NULL,
+    quantidade INTEGER NOT NULL,
+    produto_id INTEGER NOT NULL REFERENCES produtos(id),
+    cliente_id INTEGER NOT NULL REFERENCES clientes(id)
+);
+```
 
 ---
 
