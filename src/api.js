@@ -1,35 +1,41 @@
 require('dotenv').config();
-
-// Valida a existência da variável de ambiente DB_FILE
-if (!process.env.DB_FILE) {
-    console.error("ERRO: A variável de ambiente DB_FILE não está definida.");
-    console.error("Por favor, crie um arquivo .env (copiando de .env.example) e defina a variável DB_FILE.");
-    process.exit(1);
-}
-
 const express = require('express');
 const cors = require('cors');
-const sqlite3 = require('sqlite3').verbose();
+const path = require('path');
+const { Pool } = require('pg');
 
 const app = express();
 const port = process.env.API_PORT || 3000;
 
-// Conecta ao banco de dados SQLite em modo de leitura
-const db = new sqlite3.Database(process.env.DB_FILE, sqlite3.OPEN_READONLY, (err) => {
+// Configuração do Pool de Conexões do PostgreSQL
+const pool = new Pool({
+  host: process.env.DB_HOST,
+  port: process.env.DB_PORT,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_DATABASE,
+});
+
+// Testa a conexão com o banco de dados
+pool.query('SELECT NOW()', (err, res) => {
   if (err) {
-    console.error(`Erro ao abrir o banco de dados: ${err.message}`);
-    console.error('Certifique-se de que o banco de dados foi criado e populado executando o script de importação primeiro.');
+    console.error('ERRO: Não foi possível conectar ao banco de dados PostgreSQL.', err.stack);
+    console.error('Verifique se o servidor PostgreSQL está rodando e se as variáveis no arquivo .env estão corretas.');
     process.exit(1);
+  } else {
+    console.log('Conectado ao banco de dados PostgreSQL com sucesso.');
   }
-  console.log('Conectado ao banco de dados SQLite para consulta.');
 });
 
 // Middlewares
 app.use(cors());
 app.use(express.json());
 
+// Servir arquivos estáticos do front-end
+app.use(express.static(path.join(__dirname, '..', 'front-end')));
+
 // Endpoint principal para obter todas as vendas
-app.get('/vendas', (req, res) => {
+app.get('/vendas', async (req, res) => {
   const query = `
     SELECT
       v.id AS id_venda,
@@ -47,17 +53,13 @@ app.get('/vendas', (req, res) => {
     ORDER BY v.id;
   `;
 
-  db.all(query, [], (err, rows) => {
-    if (err) {
-      console.error('Erro ao buscar vendas:', err);
-      res.status(500).json({ error: 'Erro interno do servidor' });
-      return;
-    }
+  try {
+    const { rows } = await pool.query(query);
 
     // Formata a resposta para o formato JSON desejado
     const result = rows.map(row => ({
       id_venda: row.id_venda,
-      data_venda: row.data_venda, // SQLite já retorna no formato AAAA-MM-DD
+      data_venda: new Date(row.data_venda).toISOString().split('T')[0], // Formata a data para AAAA-MM-DD
       quantidade: row.quantidade,
       produto: {
         id: row.produto_id,
@@ -68,24 +70,24 @@ app.get('/vendas', (req, res) => {
         id: row.cliente_id,
         nome: row.cliente_nome
       },
-      valor_total_venda: parseFloat(row.valor_total_venda.toFixed(2))
+      valor_total_venda: parseFloat(parseFloat(row.valor_total_venda).toFixed(2))
     }));
 
     res.json(result);
-  });
+  } catch (err) {
+    console.error('Erro ao buscar vendas:', err.stack);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
 });
 
 app.listen(port, () => {
   console.log(`Servidor da API rodando em http://localhost:${port}`);
 });
 
-// Fecha a conexão com o banco de dados quando a aplicação é encerrada
-process.on('SIGINT', () => {
-  db.close((err) => {
-    if (err) {
-      return console.error(err.message);
-    }
-    console.log('Conexão com o banco de dados fechada.');
-    process.exit(0);
-  });
+// Fecha o pool de conexões quando a aplicação é encerrada
+process.on('SIGINT', async () => {
+  console.log('Fechando pool de conexões do PostgreSQL...');
+  await pool.end();
+  console.log('Pool de conexões fechado. Encerrando aplicação.');
+  process.exit(0);
 });

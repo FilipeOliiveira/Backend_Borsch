@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Vendas</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="./images/Favicon.svg">
+    <link rel="apple-touch-icon" sizes="180x180" href="./images/Favicon.svg">
+    <link rel="shortcut icon" href="./images/Favicon.svg">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="dashboard-container">
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                <img src="./images/logo_saleshub.svg">
+            </div>
+        </aside>
+
+        <main class="main-content">
+
+            <section class="summary-section">
+                <header class="header">
+                    <h1>Dashboard</h1>
+                    <div class="search-wrapper">
+                        <img src="./images/icons/search.svg" alt="Ícone de Pesquisa" class="icon-svg">
+                        <input type="text" id="searchInput" placeholder="Pesquise aqui">
+                    </div>
+                    <div class="header-actions">
+                        <img src="./images/icons/notification.svg" alt="Ícone de Notificação" class="icon-svg notification-icon">
+                        <img src="https://i.pravatar.cc/150?img=32" alt="Avatar do Usuário" class="user-avatar">
+                    </div>
+                </header>
+                
+                <div class="summary-cards">
+                    <div class="card">
+                        <div class="card-icon">
+                            <img src="./images/icons/day-sells.svg" alt="Ícone de Vendas" class="icon-svg">
+                        </div>
+                        <div class="card-info">
+                            <p>Vendas no Dia</p>
+                            <h3 id="totalSalesValue">R$ 0,00</h3>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-icon">
+                           <img src="./images/icons/iten-sells.svg" alt="Ícone de Itens Vendidos" class="icon-svg icon-white">
+                        </div>
+                        <div class="card-info">
+                            <p>Itens Vendidos</p>
+                            <h3 id="totalItemsSold">0</h3>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-icon">
+                            <img src="./images/icons/trades.svg" alt="Ícone de Transações" class="icon-svg icon-white">
+                        </div>
+                        <div class="card-info">
+                            <p>Transações</p>
+                            <h3 id="totalTransactions">0</h3>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="data-table-section">
+                <div class="table-header">
+                    <h3>Tabela de dados</h3>
+                    <button class="export-btn">
+                        <img src="./images/icons/export.svg" alt="Ícone de Exportar" class="icon-svg">
+                        Exportar CSV
+                    </button>
+                </div>
+                <div class="table-wrapper">
+                    <table id="salesTable">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Cliente</th>
+                                <th>Produto</th>
+                                <th>Quantidade</th>
+                                <th>Valor Unitário</th>
+                                <th>Valor Total</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody"></tbody>
+                    </table>
+                </div>
+                </section>
+        </main>
+    </div>
+    
+    <script src="./backend/script.js"></script>
+</body>
+</html>

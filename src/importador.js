@@ -1,16 +1,17 @@
 require('dotenv').config();
-
-// Valida a existência da variável de ambiente DB_FILE
-if (!process.env.DB_FILE) {
-    console.error("ERRO: A variável de ambiente DB_FILE não está definida.");
-    console.error("Por favor, crie um arquivo .env (copiando de .env.example) e defina a variável DB_FILE.");
-    process.exit(1);
-}
-
 const fs = require('fs');
-const sqlite3 = require('sqlite3').verbose();
+const { Pool } = require('pg');
 
-// 1. Função para parsear uma linha do arquivo de dados
+// Configuração do Pool de Conexões do PostgreSQL
+const pool = new Pool({
+  host: process.env.DB_HOST,
+  port: process.env.DB_PORT,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_DATABASE,
+});
+
+// 1. Função para parsear uma linha do arquivo de dados (sem alterações)
 function parseLine(line) {
   const idProduto = parseInt(line.substring(0, 4).trim(), 10);
   const nomeProduto = line.substring(4, 49).trim();
@@ -20,81 +21,67 @@ function parseLine(line) {
   const valorUnitStr = line.substring(111, 119).trim();
   const valorUnitario = parseFloat(valorUnitStr.slice(0, -2) + '.' + valorUnitStr.slice(-2));
   const dataVenda = line.substring(121, 131).trim();
-  return { idProduto, nomeProduto, idCliente, nomeCliente, qtdVendida, valorUnitario, dataVenda };
+  return { idProduto, nomeProduto, idCliente, nomeCliente, qtdVendida, valorUnitario, dataVenda };
 }
 
-// 2. Função que executa a importação dos dados
-function importData() {
+// 2. Função que executa a importação dos dados (reescrita para PostgreSQL)
+async function importData() {
   const filePath = process.argv[2];
   if (!filePath) {
-    console.error('Erro: Forneça o caminho do arquivo .dat como argumento.');
+    console.error('ERRO: Forneça o caminho do arquivo .dat como argumento.');
     process.exit(1);
   }
 
-  const db = new sqlite3.Database(process.env.DB_FILE, (err) => {
-    if (err) {
-      console.error('Erro ao conectar ao SQLite para importação:', err.message);
-      return process.exit(1);
-    }
-  });
-
+  // Obtém um cliente do pool de conexões. Usaremos o mesmo cliente para toda a transação.
+  const client = await pool.connect();
   console.log(`Iniciando importação do arquivo: ${filePath}`);
-  const fileContent = fs.readFileSync(filePath, 'utf-8');
-  const lines = fileContent.split('\n').filter(line => line.trim() !== '');
 
-  db.serialize(() => {
-    db.run('BEGIN TRANSACTION');
+  try {
+    const fileContent = fs.readFileSync(filePath, 'utf-8');
+    const lines = fileContent.split('\n').filter(line => line.trim() !== '');
 
-    const stmtProduto = db.prepare(`INSERT INTO produtos (id, nome, valor_unitario) VALUES ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET nome = excluded.nome, valor_unitario = excluded.valor_unitario`);
-    const stmtCliente = db.prepare(`INSERT INTO clientes (id, nome) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET nome = excluded.nome`);
-    const stmtVenda = db.prepare(`INSERT INTO vendas (produto_id, cliente_id, quantidade, data_venda) VALUES ($1, $2, $3, $4)`);
+    // Inicia a transação
+    await client.query('BEGIN');
+
+    // Prepara as queries de inserção. A sintaxe ON CONFLICT é específica do PostgreSQL.
+    const produtoQuery = 'INSERT INTO produtos (id, nome, valor_unitario) VALUES ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET nome = EXCLUDED.nome, valor_unitario = EXCLUDED.valor_unitario';
+    const clienteQuery = 'INSERT INTO clientes (id, nome) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET nome = EXCLUDED.nome';
+    const vendaQuery = 'INSERT INTO vendas (produto_id, cliente_id, quantidade, data_venda) VALUES ($1, $2, $3, $4)';
 
     for (const line of lines) {
       const venda = parseLine(line);
-      stmtProduto.run(venda.idProduto, venda.nomeProduto, venda.valorUnitario);
-      stmtCliente.run(venda.idCliente, venda.nomeCliente);
-      stmtVenda.run(venda.idProduto, venda.idCliente, venda.qtdVendida, venda.dataVenda);
+      // Insere ou atualiza o produto
+      await client.query(produtoQuery, [venda.idProduto, venda.nomeProduto, venda.valorUnitario]);
+      // Insere ou atualiza o cliente
+      await client.query(clienteQuery, [venda.idCliente, venda.nomeCliente]);
+      // Insere a venda
+      await client.query(vendaQuery, [venda.idProduto, venda.idCliente, venda.qtdVendida, venda.dataVenda]);
     }
 
-    stmtProduto.finalize();
-    stmtCliente.finalize();
-    stmtVenda.finalize();
+    // Efetiva a transação
+    await client.query('COMMIT');
+    console.log(`Importação de ${lines.length} registros concluída com sucesso!`);
 
-    db.run('COMMIT', (err) => {
-      if (err) {
-        console.error('Erro ao commitar transação:', err.message);
-      } else {
-        console.log(`Importação de ${lines.length} registros concluída com sucesso!`);
-      }
-      db.close();
-    });
+  } catch (error) {
+    // Em caso de erro, desfaz a transação
+    await client.query('ROLLBACK');
+    console.error('Erro durante a importação. A transação foi desfeita (ROLLBACK).', error);
+    process.exit(1); // Encerra com código de erro
+
+  } finally {
+    // Libera o cliente de volta para o pool, independentemente de sucesso ou falha.
+    client.release();
+  }
+}
+
+// 3. Ponto de entrada do script
+importData()
+  .then(() => {
+    console.log('Processo finalizado. Fechando pool de conexões.');
+    pool.end(); // Fecha todas as conexões do pool
+  })
+  .catch(() => {
+    console.error('Processo encontrou um erro fatal. Fechando pool de conexões.');
+    pool.end();
+    process.exit(1);
   });
-}
-
-// 3. Função que prepara o banco de dados e chama a importação
-function initializeDatabaseAndImport() {
-    const db = new sqlite3.Database(process.env.DB_FILE);
-    console.log("Verificando banco de dados...");
-
-    const init_sql = fs.readFileSync('db/init.sql', 'utf8');
-    db.exec(init_sql, (err) => {
-        // Ignora o erro se a tabela já existir
-        if (err && !err.message.includes('already exists')) {
-            console.error("Erro ao inicializar o banco de dados.", err.message);
-            db.close();
-            return;
-        }
-        
-        console.log("Banco de dados pronto.");
-        db.close((err) => {
-            if (err) {
-                return console.error("Erro ao fechar conexão de inicialização:", err.message);
-            }
-            // Chama a importação somente após garantir que o DB está pronto
-            importData();
-        });
-    });
-}
-
-// 4. Ponto de entrada do script
-initializeDatabaseAndImport();
